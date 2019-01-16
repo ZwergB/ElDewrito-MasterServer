@@ -231,27 +231,38 @@ app.get("/list", function(req, res) {
             return res.send(returnData);
         }
 
-        function isServerAvailable(uri, callback) {
-            client.hgetall(uri + ":info", function(err, obj) {
-                // can this be simplified? things i've read from ~2010 say this is the best way
-                if (err || typeof obj === undefined || !obj || typeof obj.lastUpdate === undefined || !obj.lastUpdate || obj.lastUpdate === 0) {
-                    return callback(false);
-                }
+        function clientRequest(uri) {
+            return new Promise(function(resolve, reject) {
+                client.hgetall(uri + ":info", function(err, obj) {
+                    let result = uri;
+                    // can this be simplified? things i've read from ~2010 say this is the best way
+                    if (err || typeof obj === undefined || !obj || typeof obj.lastUpdate === undefined || !obj.lastUpdate || obj.lastUpdate === 0) {
+                        result = null;
+                    }
 
-                var currentTime = Math.floor(Date.now() / 1000);
-                var lastUpdate = parseInt(obj.lastUpdate);
-                if (currentTime - lastUpdate > serverContactTimeLimit) {
-                    return callback(false);
-                }
+                    var currentTime = Math.floor(Date.now() / 1000);
+                    var lastUpdate = parseInt(obj.lastUpdate);
+                    if (currentTime - lastUpdate > serverContactTimeLimit) {
+                        result = null;
+                    }
 
-                callback(true);
+                    resolve(result);
+                });
             });
         }
 
-        async.filter(result, isServerAvailable, function(results) {
-            returnData.result.servers = results;
-            return res.send(returnData);
-        });
+        const promises = result.map(clientRequest(uri));
+        
+        Promise.all(promises)
+            .then(values => {
+                const results = values.filter(ele => ele);
+                returnData.result.servers = results;
+
+                return res.send(returnData);
+            })
+            .catch(reason => {
+                console.log(reason);
+            });
     });
 });
 
