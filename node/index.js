@@ -251,7 +251,7 @@ app.get("/list", function(req, res) {
             });
         }
 
-        const promises = result.map(clientRequest(uri));
+        const promises = result.map(clientRequest);
         
         Promise.all(promises)
             .then(values => {
